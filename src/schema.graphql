@@ -59,11 +59,6 @@ type DocumentConnection {
 
 type Query {
   """
-  Health check endpoint to verify the API is running.
-  """
-  health: String!
-
-  """
   Returns all collections in the vault.
   """
   collections: [Collection!]!
@@ -119,14 +114,6 @@ input UpdateDocumentInput {
   isArchived: Boolean
 }
 
-"""
-Input payload for moving a document to a different collection.
-"""
-input MoveDocumentInput {
-  id: ID!
-  targetCollectionId: ID!
-}
-
 type Mutation {
   """
   Creates a new collection with a unique slug.
@@ -151,5 +138,5 @@ type Mutation {
   """
   Moves a document from its current collection to a target collection.
   """
-  moveDocument(input: MoveDocumentInput!): Document!
+  moveDocument(id: ID!, collectionId: ID!): Document!
 }
