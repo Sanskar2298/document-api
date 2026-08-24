@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import { Prisma, type Collection, type Document } from "@prisma/client";
-import { prisma } from "./db";
+import type { GraphQLContext } from "./context";
 
 interface CollectionArgs {
   id: string;
@@ -93,8 +93,12 @@ const resolvers = {
     /**
      * Fetches all collections from the database.
      */
-    collections: async (): Promise<Collection[]> => {
-      return prisma.collection.findMany();
+    collections: async (
+      _parent: unknown,
+      _args: unknown,
+      context: GraphQLContext,
+    ): Promise<Collection[]> => {
+      return context.prisma.collection.findMany();
     },
 
     /**
@@ -103,8 +107,9 @@ const resolvers = {
     collection: async (
       _parent: unknown,
       args: CollectionArgs,
+      context: GraphQLContext,
     ): Promise<Collection | null> => {
-      return prisma.collection.findUnique({
+      return context.prisma.collection.findUnique({
         where: { id: args.id },
       });
     },
@@ -116,6 +121,7 @@ const resolvers = {
     documents: async (
       _parent: unknown,
       args: DocumentsArgs,
+      context: GraphQLContext,
     ): Promise<DocumentConnection> => {
       // 1. Validate take argument
       const take = args.take ?? DEFAULT_PAGE_SIZE;
@@ -169,7 +175,7 @@ const resolvers = {
         args.cursor.trim().length > 0
       ) {
         const cursorId = args.cursor.trim();
-        const cursorDocument = await prisma.document.findUnique({
+        const cursorDocument = await context.prisma.document.findUnique({
           where: { id: cursorId },
         });
 
@@ -184,7 +190,7 @@ const resolvers = {
       // 5. Execute query
       let records: Document[];
       try {
-        records = await prisma.document.findMany(findManyArgs);
+        records = await context.prisma.document.findMany(findManyArgs);
       } catch (error) {
         if (
           error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -222,11 +228,12 @@ const resolvers = {
     createCollection: async (
       _parent: unknown,
       args: { input: CreateCollectionInput },
+      context: GraphQLContext,
     ): Promise<Collection> => {
       validateCollectionInput(args.input);
 
       try {
-        return await prisma.collection.create({
+        return await context.prisma.collection.create({
           data: {
             name: args.input.name.trim(),
             slug: args.input.slug.trim(),
@@ -251,10 +258,11 @@ const resolvers = {
     createDocument: async (
       _parent: unknown,
       args: { input: CreateDocumentInput },
+      context: GraphQLContext,
     ): Promise<Document> => {
       validateCreateDocumentInput(args.input);
 
-      const collection = await prisma.collection.findUnique({
+      const collection = await context.prisma.collection.findUnique({
         where: { id: args.input.collectionId },
       });
 
@@ -263,7 +271,7 @@ const resolvers = {
       }
 
       try {
-        return await prisma.document.create({
+        return await context.prisma.document.create({
           data: {
             title: args.input.title.trim(),
             content: args.input.content.trim(),
@@ -290,6 +298,7 @@ const resolvers = {
     updateDocument: async (
       _parent: unknown,
       args: { id: string; input: UpdateDocumentInput },
+      context: GraphQLContext,
     ): Promise<Document> => {
       const dataToUpdate: Prisma.DocumentUpdateInput = {};
 
@@ -316,7 +325,7 @@ const resolvers = {
       }
 
       try {
-        return await prisma.document.update({
+        return await context.prisma.document.update({
           where: { id: args.id },
           data: dataToUpdate,
         });
@@ -339,9 +348,10 @@ const resolvers = {
     deleteDocument: async (
       _parent: unknown,
       args: { id: string },
+      context: GraphQLContext,
     ): Promise<boolean> => {
       try {
-        await prisma.document.delete({
+        await context.prisma.document.delete({
           where: { id: args.id },
         });
         return true;
@@ -364,9 +374,10 @@ const resolvers = {
     moveDocument: async (
       _parent: unknown,
       args: MoveDocumentArgs,
+      context: GraphQLContext,
     ): Promise<Document> => {
       // 1. Verify document exists
-      const document = await prisma.document.findUnique({
+      const document = await context.prisma.document.findUnique({
         where: { id: args.id },
       });
 
@@ -375,7 +386,7 @@ const resolvers = {
       }
 
       // 2. Verify target collection exists
-      const targetCollection = await prisma.collection.findUnique({
+      const targetCollection = await context.prisma.collection.findUnique({
         where: { id: args.collectionId },
       });
 
@@ -390,7 +401,7 @@ const resolvers = {
 
       // 4. Update the collection reference
       try {
-        return await prisma.document.update({
+        return await context.prisma.document.update({
           where: { id: args.id },
           data: {
             collectionId: args.collectionId,
@@ -420,8 +431,12 @@ const resolvers = {
     /**
      * Resolves nested documents belonging to the parent collection.
      */
-    documents: async (parent: Collection): Promise<Document[]> => {
-      return prisma.document.findMany({
+    documents: async (
+      parent: Collection,
+      _args: unknown,
+      context: GraphQLContext,
+    ): Promise<Document[]> => {
+      return context.prisma.document.findMany({
         where: { collectionId: parent.id },
       });
     },
