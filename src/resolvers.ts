@@ -55,6 +55,9 @@ interface MoveDocumentArgs {
  */
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
+
 function validateCollectionInput(input: CreateCollectionInput): void {
   if (!input.name || input.name.trim().length === 0) {
     throw new GraphQLError("Collection name cannot be empty");
@@ -107,15 +110,27 @@ const resolvers = {
     },
 
     /**
-     * Fetches documents with collection filtering, isArchived filtering, and substring search.
+     * Fetches documents with collection filtering, isArchived filtering,
+     * substring search, and deterministic cursor-based pagination.
      */
     documents: async (
       _parent: unknown,
       args: DocumentsArgs,
     ): Promise<DocumentConnection> => {
+      // 1. Validate take argument
+      const take = args.take ?? DEFAULT_PAGE_SIZE;
+
+      if (take <= 0) {
+        throw new GraphQLError("take must be a positive integer greater than 0");
+      }
+
+      if (take > MAX_PAGE_SIZE) {
+        throw new GraphQLError(`take cannot exceed maximum of ${MAX_PAGE_SIZE}`);
+      }
+
+      // 2. Build PostgreSQL where filters
       const where: Prisma.DocumentWhereInput = {};
 
-      // 1. Collection filter
       if (
         args.collectionId !== undefined &&
         args.collectionId !== null &&
@@ -124,12 +139,10 @@ const resolvers = {
         where.collectionId = args.collectionId.trim();
       }
 
-      // 2. Archived filter (explicit check to correctly allow boolean false)
       if (args.isArchived !== undefined && args.isArchived !== null) {
         where.isArchived = args.isArchived;
       }
 
-      // 3. Substring search across title OR content (case-insensitive in PostgreSQL)
       if (
         args.search !== undefined &&
         args.search !== null &&
@@ -142,16 +155,61 @@ const resolvers = {
         ];
       }
 
-      const items = await prisma.document.findMany({
+      // 3. Build query parameters with take + 1 for hasNextPage detection
+      const findManyArgs: Prisma.DocumentFindManyArgs = {
         where,
-        orderBy: { createdAt: "desc" },
-      });
+        take: take + 1,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      };
+
+      // 4. Validate and attach cursor
+      if (
+        args.cursor !== undefined &&
+        args.cursor !== null &&
+        args.cursor.trim().length > 0
+      ) {
+        const cursorId = args.cursor.trim();
+        const cursorDocument = await prisma.document.findUnique({
+          where: { id: cursorId },
+        });
+
+        if (!cursorDocument) {
+          throw new GraphQLError("Invalid cursor");
+        }
+
+        findManyArgs.cursor = { id: cursorId };
+        findManyArgs.skip = 1;
+      }
+
+      // 5. Execute query
+      let records: Document[];
+      try {
+        records = await prisma.document.findMany(findManyArgs);
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Invalid cursor");
+        }
+        throw error instanceof GraphQLError
+          ? error
+          : new GraphQLError("Failed to fetch documents");
+      }
+
+      // 6. Evaluate pagination metadata
+      const hasNextPage = records.length > take;
+      const items = hasNextPage ? records.slice(0, take) : records;
+      const nextCursor =
+        hasNextPage && items.length > 0
+          ? items[items.length - 1]!.id
+          : null;
 
       return {
         items,
         pageInfo: {
-          nextCursor: null,
-          hasNextPage: false,
+          nextCursor,
+          hasNextPage,
         },
       };
     },
