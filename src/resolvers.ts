@@ -25,12 +25,15 @@ interface UpdateDocumentInput {
   isArchived?: boolean;
 }
 
+interface MoveDocumentArgs {
+  id: string;
+  collectionId: string;
+}
+
 /**
  * Slug regex:
  * - Allows lowercase alphanumeric characters and single hyphens.
  * - Disallows leading, trailing, or consecutive hyphens.
- * - Example valid: "engineering-docs", "v2-spec-2026", "api"
- * - Example invalid: "Engineering Docs", "-slug", "slug-", "slug--slug", "slug!"
  */
 const SLUG_REGEX = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -125,7 +128,6 @@ const resolvers = {
     ): Promise<Document> => {
       validateCreateDocumentInput(args.input);
 
-      // Verify the parent collection exists
       const collection = await prisma.collection.findUnique({
         where: { id: args.input.collectionId },
       });
@@ -227,6 +229,63 @@ const resolvers = {
         throw error instanceof GraphQLError
           ? error
           : new GraphQLError("Failed to delete document");
+      }
+    },
+
+    /**
+     * Moves a document to a different collection.
+     */
+    moveDocument: async (
+      _parent: unknown,
+      args: MoveDocumentArgs,
+    ): Promise<Document> => {
+      // 1. Verify document exists
+      const document = await prisma.document.findUnique({
+        where: { id: args.id },
+      });
+
+      if (!document) {
+        throw new GraphQLError("Document not found");
+      }
+
+      // 2. Verify target collection exists
+      const targetCollection = await prisma.collection.findUnique({
+        where: { id: args.collectionId },
+      });
+
+      if (!targetCollection) {
+        throw new GraphQLError("Target collection not found");
+      }
+
+      // 3. If already in the target collection, treat as an idempotent no-op
+      if (document.collectionId === args.collectionId) {
+        return document;
+      }
+
+      // 4. Update the collection reference
+      try {
+        return await prisma.document.update({
+          where: { id: args.id },
+          data: {
+            collectionId: args.collectionId,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Document not found");
+        }
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2003"
+        ) {
+          throw new GraphQLError("Target collection not found");
+        }
+        throw error instanceof GraphQLError
+          ? error
+          : new GraphQLError("Failed to move document");
       }
     },
   },
