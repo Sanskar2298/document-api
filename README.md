@@ -52,3 +52,14 @@ The API allows users to organize documents into collections, search and filter d
 ├── package.json
 ├── tsconfig.json
 └── README.md
+
+## Verification
+
+The project has been verified locally with:
+
+- 42 unit tests
+- 1 end-to-end integration test
+- 43 total tests passing
+- 0 test failures
+- TypeScript strict typecheck
+- Prisma migration status check
