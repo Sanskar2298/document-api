@@ -6,6 +6,24 @@ interface CollectionArgs {
   id: string;
 }
 
+interface DocumentsArgs {
+  collectionId?: string;
+  search?: string;
+  isArchived?: boolean;
+  take?: number;
+  cursor?: string;
+}
+
+interface PageInfo {
+  nextCursor: string | null;
+  hasNextPage: boolean;
+}
+
+interface DocumentConnection {
+  items: Document[];
+  pageInfo: PageInfo;
+}
+
 interface CreateCollectionInput {
   name: string;
   slug: string;
@@ -86,6 +104,56 @@ const resolvers = {
       return prisma.collection.findUnique({
         where: { id: args.id },
       });
+    },
+
+    /**
+     * Fetches documents with collection filtering, isArchived filtering, and substring search.
+     */
+    documents: async (
+      _parent: unknown,
+      args: DocumentsArgs,
+    ): Promise<DocumentConnection> => {
+      const where: Prisma.DocumentWhereInput = {};
+
+      // 1. Collection filter
+      if (
+        args.collectionId !== undefined &&
+        args.collectionId !== null &&
+        args.collectionId.trim().length > 0
+      ) {
+        where.collectionId = args.collectionId.trim();
+      }
+
+      // 2. Archived filter (explicit check to correctly allow boolean false)
+      if (args.isArchived !== undefined && args.isArchived !== null) {
+        where.isArchived = args.isArchived;
+      }
+
+      // 3. Substring search across title OR content (case-insensitive in PostgreSQL)
+      if (
+        args.search !== undefined &&
+        args.search !== null &&
+        args.search.trim().length > 0
+      ) {
+        const searchTerm = args.search.trim();
+        where.OR = [
+          { title: { contains: searchTerm, mode: "insensitive" } },
+          { content: { contains: searchTerm, mode: "insensitive" } },
+        ];
+      }
+
+      const items = await prisma.document.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+      });
+
+      return {
+        items,
+        pageInfo: {
+          nextCursor: null,
+          hasNextPage: false,
+        },
+      };
     },
   },
 
