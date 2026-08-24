@@ -18,6 +18,13 @@ interface CreateDocumentInput {
   collectionId: string;
 }
 
+interface UpdateDocumentInput {
+  title?: string;
+  content?: string;
+  tags?: string[];
+  isArchived?: boolean;
+}
+
 /**
  * Slug regex:
  * - Allows lowercase alphanumeric characters and single hyphens.
@@ -43,7 +50,7 @@ function validateCollectionInput(input: CreateCollectionInput): void {
   }
 }
 
-function validateDocumentInput(input: CreateDocumentInput): void {
+function validateCreateDocumentInput(input: CreateDocumentInput): void {
   if (!input.title || input.title.trim().length === 0) {
     throw new GraphQLError("Document title cannot be empty");
   }
@@ -116,7 +123,7 @@ const resolvers = {
       _parent: unknown,
       args: { input: CreateDocumentInput },
     ): Promise<Document> => {
-      validateDocumentInput(args.input);
+      validateCreateDocumentInput(args.input);
 
       // Verify the parent collection exists
       const collection = await prisma.collection.findUnique({
@@ -146,6 +153,80 @@ const resolvers = {
         throw error instanceof GraphQLError
           ? error
           : new GraphQLError("Failed to create document");
+      }
+    },
+
+    /**
+     * Updates an existing document with partial updates.
+     */
+    updateDocument: async (
+      _parent: unknown,
+      args: { id: string; input: UpdateDocumentInput },
+    ): Promise<Document> => {
+      const dataToUpdate: Prisma.DocumentUpdateInput = {};
+
+      if (args.input.title !== undefined) {
+        if (args.input.title.trim().length === 0) {
+          throw new GraphQLError("Document title cannot be empty");
+        }
+        dataToUpdate.title = args.input.title.trim();
+      }
+
+      if (args.input.content !== undefined) {
+        if (args.input.content.trim().length === 0) {
+          throw new GraphQLError("Document content cannot be empty");
+        }
+        dataToUpdate.content = args.input.content.trim();
+      }
+
+      if (args.input.tags !== undefined) {
+        dataToUpdate.tags = args.input.tags;
+      }
+
+      if (args.input.isArchived !== undefined) {
+        dataToUpdate.isArchived = args.input.isArchived;
+      }
+
+      try {
+        return await prisma.document.update({
+          where: { id: args.id },
+          data: dataToUpdate,
+        });
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Document not found");
+        }
+        throw error instanceof GraphQLError
+          ? error
+          : new GraphQLError("Failed to update document");
+      }
+    },
+
+    /**
+     * Deletes a document by ID. Returns true if successfully deleted.
+     */
+    deleteDocument: async (
+      _parent: unknown,
+      args: { id: string },
+    ): Promise<boolean> => {
+      try {
+        await prisma.document.delete({
+          where: { id: args.id },
+        });
+        return true;
+      } catch (error) {
+        if (
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === "P2025"
+        ) {
+          throw new GraphQLError("Document not found");
+        }
+        throw error instanceof GraphQLError
+          ? error
+          : new GraphQLError("Failed to delete document");
       }
     },
   },
