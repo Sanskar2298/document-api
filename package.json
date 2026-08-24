@@ -11,6 +11,8 @@
     "db:migrate": "bunx prisma migrate dev",
     "db:studio": "bunx prisma studio",
     "typecheck": "tsc --noEmit",
+    "test:unit": "bun test tests/collections.test.ts tests/documents.test.ts tests/mutations.test.ts",
+    "test:integration": "bun test tests/integration.test.ts",
     "test": "bun test"
   },
   "dependencies": {
