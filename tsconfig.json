@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    /* Strict Mode */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Module Resolution */
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+
+    /* Type Checking Only — Bun handles transpilation */
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    /* Path Resolution */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
+    /* Bun Types */
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules"]
+}

@@ -1,0 +1,155 @@
+"""
+An ISO-8601 encoded UTC date-time string.
+"""
+scalar DateTime
+
+"""
+A Collection organizes related documents under a unique slug.
+"""
+type Collection {
+  id: ID!
+  name: String!
+  slug: String!
+  createdAt: DateTime!
+  documents: [Document!]!
+}
+
+"""
+A Document represents a content item stored inside a collection.
+"""
+type Document {
+  id: ID!
+  title: String!
+  content: String!
+  tags: [String!]!
+  collectionId: ID!
+  isArchived: Boolean!
+  createdAt: DateTime!
+}
+
+"""
+Pagination metadata providing information to paginate forward.
+"""
+type PageInfo {
+  """
+  The cursor for the next page, or null if there is no next page.
+  """
+  nextCursor: String
+
+  """
+  Whether there are more items to fetch after the current page.
+  """
+  hasNextPage: Boolean!
+}
+
+"""
+A paginated result set of documents with cursor metadata.
+"""
+type DocumentConnection {
+  """
+  The list of documents in the current page.
+  """
+  items: [Document!]!
+
+  """
+  Information to help retrieve the next page.
+  """
+  pageInfo: PageInfo!
+}
+
+type Query {
+  """
+  Health check endpoint to verify the API is running.
+  """
+  health: String!
+
+  """
+  Returns all collections in the vault.
+  """
+  collections: [Collection!]!
+
+  """
+  Returns a single collection by ID, including its nested documents. Returns null if not found.
+  """
+  collection(id: ID!): Collection
+
+  """
+  Returns a paginated list of documents with optional filtering and search.
+  - collectionId: Filter by specific collection.
+  - search: Substring search across title or content.
+  - isArchived: Filter by archive status (true/false).
+  - take: Number of items to retrieve (limit).
+  - cursor: The cursor of the last item from the previous page.
+  """
+  documents(
+    collectionId: ID
+    search: String
+    isArchived: Boolean
+    take: Int
+    cursor: String
+  ): DocumentConnection!
+}
+
+"""
+Input payload for creating a new collection.
+"""
+input CreateCollectionInput {
+  name: String!
+  slug: String!
+}
+
+"""
+Input payload for creating a new document.
+"""
+input CreateDocumentInput {
+  title: String!
+  content: String!
+  tags: [String!] = []
+  collectionId: ID!
+}
+
+"""
+Input payload for partially updating an existing document.
+All fields are optional to allow partial updates.
+"""
+input UpdateDocumentInput {
+  title: String
+  content: String
+  tags: [String!]
+  isArchived: Boolean
+}
+
+"""
+Input payload for moving a document to a different collection.
+"""
+input MoveDocumentInput {
+  id: ID!
+  targetCollectionId: ID!
+}
+
+type Mutation {
+  """
+  Creates a new collection with a unique slug.
+  """
+  createCollection(input: CreateCollectionInput!): Collection!
+
+  """
+  Creates a new document inside a collection.
+  """
+  createDocument(input: CreateDocumentInput!): Document!
+
+  """
+  Updates specific fields on an existing document (partial update).
+  """
+  updateDocument(id: ID!, input: UpdateDocumentInput!): Document!
+
+  """
+  Deletes a document by ID. Returns true if successfully deleted.
+  """
+  deleteDocument(id: ID!): Boolean!
+
+  """
+  Moves a document from its current collection to a target collection.
+  """
+  moveDocument(input: MoveDocumentInput!): Document!
+}

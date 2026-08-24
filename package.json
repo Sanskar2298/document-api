@@ -1,0 +1,26 @@
+{
+  "name": "document-vault",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "gendb": "bunx prisma migrate dev && bunx prisma generate",
+    "db:generate": "bunx prisma generate",
+    "db:migrate": "bunx prisma migrate dev",
+    "db:studio": "bunx prisma studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "graphql": "^16.10.0",
+    "graphql-yoga": "^5.10.6",
+    "@prisma/client": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.0",
+    "@types/node": "^22.10.0",
+    "prisma": "^6.9.0",
+    "typescript": "^5.7.0"
+  }
+}
